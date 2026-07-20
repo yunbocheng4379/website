@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
+
+const helperPath = new URL('../src/noteAppUrl.ts', import.meta.url)
+const appPath = new URL('../src/App.tsx', import.meta.url)
+
+function readRequiredFile(relativePath) {
+  const fileUrl = new URL(`../${relativePath}`, import.meta.url)
+  assert.ok(existsSync(fileUrl), `${relativePath} does not exist`)
+  return readFileSync(fileUrl, 'utf8')
+}
+
+assert.ok(existsSync(helperPath), 'src/noteAppUrl.ts does not exist')
+
+const helperSource = readFileSync(helperPath, 'utf8')
+const appSource = readFileSync(appPath, 'utf8')
+
+assert.match(helperSource, /export function getNoteAppUrl/)
+assert.match(helperSource, /VITE_NOTE_APP_URL/)
+assert.match(helperSource, /VITE_NOTE_APP_PORT/)
+assert.match(helperSource, /['"]3015['"]/)
+assert.doesNotMatch(appSource, /http:\/\/localhost:3015\//)
+
+const dockerfile = readRequiredFile('Dockerfile')
+const nginxConfig = readRequiredFile('nginx.conf')
+const composeConfig = readRequiredFile('docker-compose.yml')
+readRequiredFile('.dockerignore')
+const envExample = readRequiredFile('.env.example')
+
+assert.match(dockerfile, /FROM node:22-alpine AS build/)
+assert.match(dockerfile, /npm ci/)
+assert.match(dockerfile, /npm run build/)
+assert.match(dockerfile, /FROM nginx:1\.28-alpine AS runtime/)
+assert.match(dockerfile, /VITE_NOTE_APP_URL/)
+assert.match(dockerfile, /VITE_NOTE_APP_PORT/)
+assert.match(nginxConfig, /try_files \$uri \$uri\/ \/index\.html/)
+assert.match(nginxConfig, /location = \/health/)
+assert.match(composeConfig, /\$\{APP_PORT:-8080\}:80/)
+assert.match(composeConfig, /VITE_NOTE_APP_URL/)
+assert.match(composeConfig, /VITE_NOTE_APP_PORT/)
+assert.match(composeConfig, /restart: unless-stopped/)
+assert.match(composeConfig, /healthcheck:/)
+assert.match(envExample, /APP_PORT=8080/)
+assert.match(envExample, /NOTE_APP_PORT=3015/)
+
+const deploymentGuide = readRequiredFile('DEPLOYMENT.md')
+assert.match(deploymentGuide, /docker compose version/)
+assert.match(deploymentGuide, /cp \.env\.example \.env/)
+assert.match(deploymentGuide, /docker compose up -d --build/)
+assert.match(deploymentGuide, /docker compose ps/)
+assert.match(deploymentGuide, /docker compose logs/)
+assert.match(deploymentGuide, /\/health/)
+assert.match(deploymentGuide, /docker compose down/)
+assert.match(deploymentGuide, /8080/)
+assert.match(deploymentGuide, /3015/)
+assert.match(deploymentGuide, /防火墙|安全组/)
+assert.match(deploymentGuide, /NOTE_APP_URL/)
+assert.match(deploymentGuide, /HTTPS/)
+
+console.log('Deployment URL checks passed.')

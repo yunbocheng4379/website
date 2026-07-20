@@ -1,0 +1,17 @@
+services:
+  web:
+    image: prompt-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      args:
+        VITE_NOTE_APP_URL: ${NOTE_APP_URL:-}
+        VITE_NOTE_APP_PORT: ${NOTE_APP_PORT:-3015}
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
