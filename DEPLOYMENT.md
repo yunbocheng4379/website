@@ -1,39 +1,45 @@
-# Docker 服务器部署指南
+# Docker 服务器部署说明
 
-本项目是 React + TypeScript + Vite 前端。Docker 会先使用 Node.js 构建静态文件，再使用 Nginx 提供生产服务。以下示例假设：
+本项目是 React + TypeScript + Vite 前端。Docker 使用 Node.js 构建静态文件，再由 Nginx 提供生产服务。
 
-- 项目在服务器上的目录是 `/opt/prompt`
-- 当前网站通过服务器的 `8080` 端口访问
-- “笔记生花”应用运行在同一服务器的 `3015` 端口
-- 服务器系统是 Ubuntu 22.04、24.04 或 26.04
+本文档分为两部分：
 
-## 1. 准备服务器端口
+1. 新服务器上的首次部署。
+2. 代码更新后的重新部署。
 
-默认需要允许客户端访问以下 TCP 端口：
+以下命令以 Ubuntu 22.04、24.04 或 26.04 为例，并约定：
 
-- `8080`：当前网站
-- `3015`：“笔记生花”应用；只有该服务确实运行在此端口时才开放
+- GitHub 仓库：`https://github.com/yunbocheng4379/website`
+- 生产分支：`main`
+- 服务器部署目录：`/opt/website`
+- 当前网站端口：`8080`
+- “笔记生花”应用端口：`3015`
 
-还应保留 SSH 使用的端口，通常是 `22`。如果服务器来自阿里云、腾讯云、华为云或其他云厂商，需要同时修改云平台安全组；仅修改服务器内部防火墙通常不够。
+> `dev` 分支用于开发测试，生产服务器应部署 `main` 分支。
 
-Docker 发布的端口可能绕过部分 UFW 规则。生产环境应同时使用云安全组，并根据 [Docker 防火墙官方说明](https://docs.docker.com/engine/network/packet-filtering-firewalls/) 配置 `DOCKER-USER` 链。
+## 一、首次部署
 
-## 2. 安装 Docker Engine 和 Compose
-
-如果服务器已经安装 Docker Engine 和 Compose V2，可以直接检查：
+### 1. 登录服务器
 
 ```bash
-docker --version
-docker compose version
+ssh 用户名@服务器公网IP
 ```
 
-如果尚未安装，Ubuntu 可使用 Docker 官方软件源：
+### 2. 安装 Git、Docker Engine 和 Compose
+
+安装基础工具：
 
 ```bash
 sudo apt update
-sudo apt install -y ca-certificates curl
+sudo apt install -y git ca-certificates curl
+```
+
+添加 Docker 官方软件源并安装 Docker Engine：
+
+```bash
 sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 
 sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
@@ -48,53 +54,86 @@ EOF
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo systemctl enable --now docker
-sudo docker run --rm hello-world
+```
+
+检查安装：
+
+```bash
+sudo docker --version
 sudo docker compose version
+sudo docker run --rm hello-world
 ```
 
-其他系统请使用对应的 [Docker Engine 官方安装说明](https://docs.docker.com/engine/install/)。不要在生产服务器上使用官方标注为仅适合测试和开发的便捷安装脚本。
+其他 Linux 发行版请参考 [Docker Engine 官方安装文档](https://docs.docker.com/engine/install/)。
 
-本文后续命令省略了 `sudo`。如果当前用户没有访问 Docker 的权限，请在每条 `docker` 命令前添加 `sudo`。将用户加入 `docker` 组相当于授予主机上的高权限，应先评估安全风险。
+本文后续命令省略了 `sudo`。如果当前用户没有 Docker 权限，请在每条 `docker` 命令前添加 `sudo`。
 
-## 3. 上传项目
+### 3. 检查服务器访问 Docker Hub 的网络
 
-先在服务器上准备目录：
+项目首次构建需要以下镜像：
 
 ```bash
-sudo mkdir -p /opt/prompt
-sudo chown "$USER":"$USER" /opt/prompt
+docker pull docker/dockerfile:1
+docker pull node:22-alpine
+docker pull nginx:1.28-alpine
 ```
 
-从本地电脑上传项目时，不需要上传 `node_modules` 和 `dist`。可以使用 Git、SFTP、SCP 或 rsync。例如在本地项目目录的上一级执行：
+三个镜像都成功拉取后再继续部署。
 
-```bash
-rsync -av --exclude node_modules --exclude dist prompt/ 用户名@服务器IP:/opt/prompt/
-```
+如果出现 `auth.docker.io timeout` 或 `i/o timeout`，说明服务器无法正常访问 Docker Hub。需要在服务器上配置可用代理或可信的 Registry 镜像加速器。
 
-上传后，服务器目录至少应包含：
+本地 Mac 上的代理地址不能直接用于服务器，例如：
 
 ```text
-/opt/prompt/
-├── src/
-├── package.json
-├── package-lock.json
-├── Dockerfile
-├── docker-compose.yml
-├── nginx.conf
-└── .env.example
+127.0.0.1:7897
 ```
 
-## 4. 配置部署参数
+服务器中的 `127.0.0.1` 指向服务器自身，而不是本地电脑。服务器必须使用它能够直接访问的代理地址。Docker Registry Mirror 的配置方法可参考 [Docker 官方镜像缓存文档](https://docs.docker.com/docker-hub/image-library/mirror/)。
 
-登录服务器并进入项目目录：
+### 4. 准备部署目录
 
 ```bash
-cd /opt/prompt
+sudo mkdir -p /opt/website
+sudo chown "$USER":"$USER" /opt/website
+```
+
+### 5. 克隆生产代码
+
+如果仓库允许通过 HTTPS 拉取：
+
+```bash
+git clone -b main https://github.com/yunbocheng4379/website.git /opt/website
+```
+
+如果仓库是私有仓库，并且服务器已经配置 GitHub SSH Key：
+
+```bash
+git clone -b main git@github.com:yunbocheng4379/website.git /opt/website
+```
+
+进入项目并确认分支：
+
+```bash
+cd /opt/website
+git branch --show-current
+git log -1 --oneline
+```
+
+`git branch --show-current` 应输出：
+
+```text
+main
+```
+
+### 6. 创建部署配置
+
+```bash
+cd /opt/website
 cp .env.example .env
 nano .env
 ```
 
-默认配置如下：
+默认配置：
 
 ```dotenv
 APP_PORT=8080
@@ -103,75 +142,49 @@ NOTE_APP_URL=
 IMAGE_TAG=latest
 ```
 
-参数含义：
+参数说明：
 
 - `APP_PORT`：当前网站在服务器上开放的端口。
-- `NOTE_APP_PORT`：“笔记生花”应用所在端口。
-- `NOTE_APP_URL`：可选的完整地址。留空时，页面会自动使用“当前服务器主机名 + `NOTE_APP_PORT`”。
-- `IMAGE_TAG`：镜像版本标签。正式环境建议使用日期或版本号，例如 `20260720-1`，便于回滚。
+- `NOTE_APP_PORT`：“笔记生花”服务所在端口。
+- `NOTE_APP_URL`：可选的完整访问地址。留空时自动使用当前服务器主机名和 `NOTE_APP_PORT`。
+- `IMAGE_TAG`：构建镜像的标签；生产环境也可以使用日期或版本号。
 
-例如，用户访问 `http://203.0.113.10:8080/` 时，留空的 `NOTE_APP_URL` 会让目标链接自动变为 `http://203.0.113.10:3015/`。
+例如用户访问：
 
-如果目标应用使用独立域名或 HTTPS，应直接设置完整地址：
+```text
+http://203.0.113.10:8080/
+```
+
+当 `NOTE_APP_URL` 留空时，页面中的相关链接会自动指向：
+
+```text
+http://203.0.113.10:3015/
+```
+
+如果“笔记生花”使用独立域名或 HTTPS，应设置完整地址：
 
 ```dotenv
 NOTE_APP_URL=https://notes.example.com/
 ```
 
-`VITE_*` 配置会在构建镜像时写入前端资源，因此修改 `.env` 后必须重新执行带 `--build` 的启动命令。
+这些配置会在构建镜像时写入前端文件。修改 `.env` 后，必须重新构建镜像才能生效。
 
-## 5. 构建并启动
-
-先检查 Compose 配置，再构建并后台启动：
+### 7. 检查 Compose 配置
 
 ```bash
-cd /opt/prompt
+cd /opt/website
 docker compose config
+```
+
+如果该命令没有报错，再继续构建。
+
+### 8. 首次构建并启动
+
+```bash
 docker compose up -d --build
 ```
 
-首次构建需要从 Docker Hub 下载 Node.js 和 Nginx 基础镜像，耗时取决于服务器网络。
-
-查看容器状态和日志：
-
-```bash
-docker compose ps
-docker compose logs --tail=100 web
-```
-
-正常情况下，`docker compose ps` 会显示服务为 `healthy`。启动后的前几秒可能暂时显示 `health: starting`。
-
-## 6. 在服务器内验证
-
-检查健康接口：
-
-```bash
-curl --fail http://127.0.0.1:8080/health
-```
-
-正常输出为：
-
-```text
-ok
-```
-
-再检查首页响应：
-
-```bash
-curl --fail --head http://127.0.0.1:8080/
-```
-
-应看到 `HTTP/1.1 200 OK`。如果修改了 `APP_PORT`，请同步替换以上命令中的 `8080`。
-
-最后从自己的电脑访问：
-
-```text
-http://服务器公网IP:8080/
-```
-
-点击“笔记生花”或“See Our Work”，确认浏览器打开同一服务器的 `3015` 端口，而不是 `localhost`。
-
-## 7. 日常管理
+首次构建会安装 npm 依赖并生成前端生产文件，耗时取决于服务器网络。
 
 查看状态：
 
@@ -179,7 +192,197 @@ http://服务器公网IP:8080/
 docker compose ps
 ```
 
-持续查看日志：
+容器刚启动时可能短暂显示 `health: starting`，正常情况下随后会变成 `healthy`。
+
+查看日志：
+
+```bash
+docker compose logs --tail=100 web
+```
+
+### 9. 在服务器内部验证
+
+检查健康接口：
+
+```bash
+curl --fail http://127.0.0.1:8080/health
+```
+
+正常输出：
+
+```text
+ok
+```
+
+检查首页：
+
+```bash
+curl --head http://127.0.0.1:8080/
+```
+
+应返回：
+
+```text
+HTTP/1.1 200 OK
+```
+
+如果修改了 `APP_PORT`，需要同步修改验证命令中的 `8080`。
+
+### 10. 配置安全组和防火墙
+
+在云服务器安全组中按实际需要开放：
+
+- TCP `22`：SSH 管理端口。
+- TCP `8080`：当前网站。
+- TCP `3015`：“笔记生花”服务；只有该服务需要被公网直接访问时才开放。
+
+如果服务器使用 UFW：
+
+```bash
+sudo ufw allow 8080/tcp
+sudo ufw allow 3015/tcp
+sudo ufw status
+```
+
+Docker 发布的端口可能绕过部分 UFW 规则，云服务器应同时使用安全组限制访问范围。详细说明见 [Docker 防火墙文档](https://docs.docker.com/engine/network/packet-filtering-firewalls/)。
+
+### 11. 从浏览器访问
+
+```text
+http://服务器公网IP:8080/
+```
+
+同时测试“笔记生花”服务：
+
+```text
+http://服务器公网IP:3015/
+```
+
+确认页面中的“笔记生花”和“See Our Work”链接使用服务器地址，而不是 `localhost`。
+
+## 二、代码更新后的重新部署
+
+更新时不需要先运行 `docker compose down`。直接重新构建并启动，Compose 会替换旧容器，从而减少停机时间。
+
+### 1. 进入项目目录
+
+```bash
+cd /opt/website
+```
+
+### 2. 检查服务器上是否存在未提交修改
+
+```bash
+git status
+```
+
+正常情况下应显示工作区干净。如果存在人为修改，不要直接拉取代码，应先确认这些修改是否需要保留。
+
+### 3. 拉取最新生产代码
+
+```bash
+git checkout main
+git fetch origin
+git pull --ff-only origin main
+```
+
+确认最新提交：
+
+```bash
+git log -1 --oneline
+```
+
+使用 `--ff-only` 可以避免在生产服务器上意外产生合并提交。
+
+### 4. 检查环境配置
+
+确认 `.env` 仍然存在：
+
+```bash
+ls -la .env
+sed -n '1,120p' .env
+```
+
+`.env` 已加入 `.gitignore`，正常情况下拉取代码不会覆盖它。
+
+### 5. 重新构建并部署
+
+```bash
+docker compose config
+docker compose up -d --build --remove-orphans
+```
+
+该命令会：
+
+1. 使用最新代码重新构建前端。
+2. 生成新的 Nginx 运行镜像。
+3. 替换旧容器。
+4. 清理当前 Compose 项目中已经不再使用的孤立容器。
+
+### 6. 验证新版本
+
+```bash
+docker compose ps
+docker compose logs --tail=100 web
+curl --fail http://127.0.0.1:8080/health
+curl --head http://127.0.0.1:8080/
+```
+
+确认：
+
+- 容器状态为 `healthy`。
+- 健康接口返回 `ok`。
+- 首页返回 HTTP 200。
+- 浏览器中的页面内容已经更新。
+
+### 7. 日常更新快捷命令
+
+确认服务器工作区没有本地修改后，可以依次执行：
+
+```bash
+cd /opt/website
+git checkout main
+git pull --ff-only origin main
+docker compose up -d --build --remove-orphans
+docker compose ps
+curl --fail http://127.0.0.1:8080/health
+```
+
+## 三、部署失败时回滚
+
+查看最近提交：
+
+```bash
+cd /opt/website
+git log --oneline -5
+```
+
+选择上一个正常提交，并重新构建：
+
+```bash
+git checkout 上一个正常提交ID
+docker compose up -d --build
+docker compose ps
+curl --fail http://127.0.0.1:8080/health
+```
+
+问题修复后回到生产分支：
+
+```bash
+git checkout main
+git pull --ff-only origin main
+docker compose up -d --build
+```
+
+## 四、常用运维命令
+
+查看容器状态：
+
+```bash
+docker compose ps
+```
+
+查看实时日志：
 
 ```bash
 docker compose logs -f --tail=100 web
@@ -191,60 +394,69 @@ docker compose logs -f --tail=100 web
 docker compose restart web
 ```
 
-停止并保留容器：
+停止服务：
 
 ```bash
 docker compose stop
 ```
 
-重新启动已停止的容器：
+启动已停止的服务：
 
 ```bash
 docker compose start
 ```
 
-停止并移除容器和 Compose 网络：
+停止并移除容器和当前 Compose 网络：
 
 ```bash
 docker compose down
 ```
 
-`docker compose down` 不会删除已经构建的镜像。不要随意使用带 `-v` 的删除命令或全局 `docker system prune`，以免影响服务器上的其他项目。
+`docker compose down` 不会删除构建好的镜像。
 
-## 8. 更新版本
-
-将新代码上传到 `/opt/prompt`，确认 `.env` 未被覆盖，然后执行：
+清理本项目构建留下的悬空镜像：
 
 ```bash
-cd /opt/prompt
-docker compose up -d --build
-docker compose ps
-curl --fail http://127.0.0.1:8080/health
+docker image prune -f
 ```
 
-生产环境建议每次发布前修改 `.env` 中的镜像标签：
+不要随意执行 `docker system prune -a`，它可能删除服务器上其他项目使用的镜像。
+
+## 五、域名和 HTTPS
+
+当前容器直接提供 HTTP 服务。需要域名和 HTTPS 时，可以在宿主机或单独的网关容器中使用 Nginx、Caddy 或云负载均衡，将域名反向代理到：
+
+```text
+http://127.0.0.1:8080
+```
+
+如果主站使用 HTTPS，“笔记生花”也应提供 HTTPS 地址。可以在 `.env` 中设置：
 
 ```dotenv
-IMAGE_TAG=20260720-2
+NOTE_APP_URL=https://notes.example.com/
 ```
 
-这样旧镜像会被保留，出现问题时可以把 `IMAGE_TAG` 改回旧值，然后执行：
+修改后重新构建：
 
 ```bash
-docker compose up -d --no-build
+docker compose up -d --build
 ```
 
-只有确认新版本稳定后，才考虑手动删除不再需要的旧镜像。
+## 六、常见故障排查
 
-## 9. 域名和 HTTPS
+### 1. Docker Hub 拉取超时
 
-当前容器只提供 HTTP。需要域名和 HTTPS 时，可在宿主机或单独的网关容器中使用 Nginx、Caddy 或云负载均衡，将域名反向代理到 `127.0.0.1:8080`。
+分别测试：
 
-如果主站已经使用 HTTPS，浏览器生成的关联地址也会使用 HTTPS。此时 `3015` 服务必须支持 HTTPS；否则应为关联应用配置 HTTPS 域名，并通过 `NOTE_APP_URL=https://notes.example.com/` 显式覆盖，然后重新构建。
+```bash
+docker pull docker/dockerfile:1
+docker pull node:22-alpine
+docker pull nginx:1.28-alpine
+```
 
-## 10. 常见问题
+如果仍然出现 `auth.docker.io timeout`，检查服务器的代理或可信镜像加速配置。
 
-### `8080` 端口已被占用
+### 2. `8080` 端口已被占用
 
 修改 `.env`：
 
@@ -252,9 +464,15 @@ docker compose up -d --no-build
 APP_PORT=8081
 ```
 
-然后重新启动，并在安全组、访问地址和健康检查命令中使用新端口。
+然后重新部署：
 
-### 容器不断重启或显示 `unhealthy`
+```bash
+docker compose up -d --build
+```
+
+安全组、访问地址和健康检查命令也需要使用新端口。
+
+### 3. 容器不是 `healthy`
 
 ```bash
 docker compose ps
@@ -262,22 +480,10 @@ docker compose logs --tail=200 web
 docker inspect --format '{{json .State.Health}}' "$(docker compose ps -q web)"
 ```
 
-最后一条命令会自动取得当前 Compose 服务对应的容器 ID。
+### 4. 页面能打开，但 `3015` 链接无法访问
 
-### 镜像拉取超时
+检查“笔记生花”服务是否监听服务器的 `3015` 端口，并确认云安全组和防火墙允许访问。也可以设置完整的 `NOTE_APP_URL` 后重新构建。
 
-先确认服务器可以访问 `registry-1.docker.io` 和 `auth.docker.io`，然后重试：
+### 5. 背景视频或字体没有显示
 
-```bash
-docker compose build --pull
-```
-
-如果服务器网络受限，请按云服务商或团队运维规范配置可信的 Docker Registry 镜像源，不要使用来源不明的公共镜像站。
-
-### 页面能打开，但 `3015` 链接打不开
-
-检查关联应用是否正在监听服务器的 `3015` 端口，并确认云安全组和防火墙允许访问。也可以将 `NOTE_APP_URL` 改为已经可访问的完整地址，再重新构建当前项目。
-
-### 页面没有显示背景视频或字体
-
-背景视频和字体来自外部站点，并未打包进 Docker 镜像。请检查浏览器开发者工具中的网络请求，以及服务器或客户端网络是否能够访问这些外部资源。
+背景视频和字体来自外部站点，没有打包进 Docker 镜像。请检查客户端网络和浏览器开发者工具中的网络请求。
