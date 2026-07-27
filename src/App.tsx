@@ -1,20 +1,78 @@
 import { useState } from 'react'
-import { ArrowUpRight, Award, Crown, X } from 'lucide-react'
-import { getNoteAppUrl } from './noteAppUrl'
+import { ArrowUpRight, Award, X } from 'lucide-react'
+import { getNoteAppUrl, getWhaleFallAppUrl } from './noteAppUrl'
 
 const VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260606_154941_df1a96e1-a06f-450c-bd02-d863414cc1a0.mp4'
 
 const NAV_LINKS = [
-  { label: 'Studio', href: '#' },
   { label: 'Offerings', href: '#' },
   { label: 'Inquire', href: '#' },
 ]
 
+function CetaeonMark({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      role="img"
+      aria-label="鲸序标志"
+      className={className}
+    >
+      <rect
+        x="8.5"
+        y="8.5"
+        width="47"
+        height="47"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M17 19 C23 20.5 28 24.5 32 31 C36 24.5 41 20.5 47 19 C45.5 28 39 35 32 38 C25 35 18.5 28 17 19 Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M32 31 L32 49"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <circle cx="32" cy="49" r="2.1" fill="currentColor" />
+      <circle cx="24" cy="53" r="1.35" fill="#e24a39" />
+      <circle cx="40" cy="53.5" r="1.35" fill="#e24a39" />
+    </svg>
+  )
+}
+
+function BrandLockup() {
+  return (
+    <span className="flex items-center gap-3 text-white">
+      <CetaeonMark className="h-8 w-8 sm:h-9 sm:w-9" />
+      <span className="flex items-baseline gap-2">
+        <span className="font-podium text-2xl font-bold uppercase tracking-wider sm:text-3xl">
+          CETAEON
+        </span>
+        <span className="hidden font-inter text-sm font-semibold text-white/70 sm:inline">
+          鲸序
+        </span>
+      </span>
+    </span>
+  )
+}
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const noteAppUrl = getNoteAppUrl()
-  const navLinks = [{ label: '笔记生花', href: noteAppUrl }, ...NAV_LINKS]
+  const whaleFallAppUrl = getWhaleFallAppUrl()
+  const navLinks = [
+    { label: '笔记生花', href: noteAppUrl },
+    { label: '鲸落“生”', href: whaleFallAppUrl },
+    ...NAV_LINKS,
+  ]
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-black">
@@ -30,9 +88,7 @@ function App() {
 
       <div className="relative z-10 flex h-full w-full flex-col">
         <nav className="flex items-center justify-between px-6 py-5 sm:px-10 lg:px-16 lg:py-7">
-          <span className="font-podium text-2xl font-bold uppercase tracking-wider text-white sm:text-3xl">
-            VANGUARD
-          </span>
+          <BrandLockup />
 
           <div className="hidden items-center gap-10 md:flex">
             {navLinks.map((link) => (
@@ -73,9 +129,7 @@ function App() {
           }`}
         >
           <div className="flex items-center justify-between px-6 py-5 sm:px-10">
-            <span className="font-podium text-2xl font-bold uppercase tracking-wider text-white sm:text-3xl">
-              VANGUARD
-            </span>
+            <BrandLockup />
             <button aria-label="Close menu" onClick={() => setMenuOpen(false)}>
               <X className="h-7 w-7 text-white" />
             </button>
@@ -118,9 +172,9 @@ function App() {
 
         <div className="flex flex-1 flex-col justify-center px-6 sm:px-10 lg:px-16">
           <div className="mb-6 flex animate-fade-up items-center gap-2 lg:mb-8">
-            <Crown className="h-4 w-4 text-white/70" />
+            <CetaeonMark className="h-5 w-5 text-white/70" />
             <span className="font-inter text-xs uppercase tracking-[0.3em] text-white/70 sm:text-sm">
-              World-Class Digital Collective
+              World-Class AI Collective
             </span>
           </div>
 
@@ -156,7 +210,7 @@ function App() {
             </div>
           </div>
 
-          <div className="animate-fade-up-delay-4 mt-8 flex flex-wrap gap-6 sm:mt-10 sm:gap-12 lg:mt-14 lg:gap-16">
+          <div className="animate-fade-up-delay-4 mt-4 flex flex-wrap gap-6 sm:mt-4 sm:gap-12 lg:mt-6 lg:gap-16">
             {[
               { value: '250+', label: 'Brands Transformed' },
               { value: '95%', label: 'Client Retention' },

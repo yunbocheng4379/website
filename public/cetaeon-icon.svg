@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CETAEON 鲸序">
+  <rect width="64" height="64" fill="#080706"/>
+  <rect x="8.5" y="8.5" width="47" height="47" fill="none" stroke="#fff7f2" stroke-width="1.5"/>
+  <path d="M17 19 C23 20.5 28 24.5 32 31 C36 24.5 41 20.5 47 19 C45.5 28 39 35 32 38 C25 35 18.5 28 17 19 Z" fill="none" stroke="#fff7f2" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M32 31 L32 49" fill="none" stroke="#fff7f2" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="32" cy="49" r="2.1" fill="#fff7f2"/>
+  <circle cx="24" cy="53" r="1.35" fill="#e24a39"/>
+  <circle cx="40" cy="53.5" r="1.35" fill="#e24a39"/>
+</svg>

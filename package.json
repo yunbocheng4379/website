@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node scripts/build-sites-worker.mjs",
+    "build": "tsc -b && vite build",
     "check:deployment": "node scripts/check-note-app-url.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
