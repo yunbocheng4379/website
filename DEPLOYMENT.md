@@ -139,6 +139,8 @@ nano .env
 APP_PORT=8080
 NOTE_APP_PORT=3015
 NOTE_APP_URL=
+WHALE_FALL_APP_PORT=8009
+WHALE_FALL_APP_URL=
 IMAGE_TAG=latest
 ```
 
@@ -147,6 +149,8 @@ IMAGE_TAG=latest
 - `APP_PORT`：当前网站在服务器上开放的端口。
 - `NOTE_APP_PORT`：“笔记生花”服务所在端口。
 - `NOTE_APP_URL`：可选的完整访问地址。留空时自动使用当前服务器主机名和 `NOTE_APP_PORT`。
+- `WHALE_FALL_APP_PORT`：“鲸落‘生’”服务所在端口。
+- `WHALE_FALL_APP_URL`：可选的完整访问地址。留空时自动使用当前服务器主机名、`WHALE_FALL_APP_PORT` 和 `/site`。
 - `IMAGE_TAG`：构建镜像的标签；生产环境也可以使用日期或版本号。
 
 例如用户访问：
@@ -161,10 +165,22 @@ http://203.0.113.10:8080/
 http://203.0.113.10:3015/
 ```
 
+当 `WHALE_FALL_APP_URL` 留空时，“鲸落‘生’”链接会自动指向：
+
+```text
+http://203.0.113.10:8009/site
+```
+
 如果“笔记生花”使用独立域名或 HTTPS，应设置完整地址：
 
 ```dotenv
 NOTE_APP_URL=https://notes.example.com/
+```
+
+生产服务器也可以显式设置“鲸落‘生’”完整地址，确保前端始终跳转到服务器 IP：
+
+```dotenv
+WHALE_FALL_APP_URL=http://47.99.136.241:8009/site
 ```
 
 这些配置会在构建镜像时写入前端文件。修改 `.env` 后，必须重新构建镜像才能生效。

@@ -6,6 +6,8 @@ services:
       args:
         VITE_NOTE_APP_URL: ${NOTE_APP_URL:-}
         VITE_NOTE_APP_PORT: ${NOTE_APP_PORT:-3015}
+        VITE_WHALE_FALL_APP_URL: ${WHALE_FALL_APP_URL:-}
+        VITE_WHALE_FALL_APP_PORT: ${WHALE_FALL_APP_PORT:-8009}
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8080}:80"
